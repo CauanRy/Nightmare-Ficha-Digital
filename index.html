@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#06121d">
+  <title>NIGHTMARE — Grimório Digital</title>
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="ambient" aria-hidden="true"></div>
+  <header class="topbar">
+    <div class="brand"><span class="sigil">◈</span><div><small>GRIMÓRIO DIGITAL</small><h1>NIGHTMARE</h1></div></div>
+    <nav class="mode-tabs" aria-label="Modo de visualização">
+      <button class="tab active" data-mode="sheet">Ficha</button>
+      <button class="tab" data-mode="combat">Combate</button>
+    </nav>
+    <div class="save-tools">
+      <span id="saveStatus" class="save-status">Salvo</span>
+      <button id="exportBtn" class="btn ghost">Exportar</button>
+      <button id="importBtn" class="btn ghost">Importar</button>
+      <button id="resetBtn" class="btn danger">Resetar</button>
+      <input id="importFile" type="file" accept="application/json,.json" hidden>
+    </div>
+  </header>
+
+  <main id="app" class="app-shell" aria-live="polite"></main>
+
+  <div id="toastRegion" class="toasts" aria-live="assertive"></div>
+  <dialog id="confirmDialog">
+    <form method="dialog" class="dialog-card">
+      <h2 id="dialogTitle">Confirmar</h2><p id="dialogText"></p>
+      <div class="dialog-actions"><button value="cancel" class="btn ghost">Cancelar</button><button value="confirm" class="btn danger">Confirmar</button></div>
+    </form>
+  </dialog>
+  <script src="script.js"></script>
+</body>
+</html>
