@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "mode": "sheet",
+  "identity": {
+    "name": "Fixture Antiga",
+    "player": "Teste",
+    "race": "Humano",
+    "className": "Arcanista",
+    "existence": "Pessoa Normal",
+    "xpCurrent": 2,
+    "xpMax": 10
+  },
+  "attributes": {
+    "forca": 1,
+    "destreza": 2,
+    "constituicao": 3,
+    "inteligencia": 4,
+    "arcanismo": 5,
+    "carisma": 1
+  },
+  "racialConfig": { "primary": "forca", "secondary": "destreza" },
+  "status": {
+    "hpCurrent": 12,
+    "hpBaseMax": 13,
+    "manaCurrent": 20,
+    "manaBaseMax": 25,
+    "traumaCurrent": 0,
+    "traumaBaseMax": 10,
+    "acBase": 11,
+    "initiative": 2,
+    "movement": 9
+  },
+  "abilities": [
+    {
+      "id": "old-active",
+      "name": "Teleporte Antigo",
+      "description": "Habilidade de versão anterior.",
+      "level": "Comum",
+      "type": "Ativa",
+      "origins": ["Adquirida"],
+      "action": "Ação Padrão"
+    }
+  ],
+  "spells": [],
+  "modifications": [],
+  "anomalies": [],
+  "inventory": { "traits": "Legado", "equipment": [], "moneyPocket": 35420 },
+  "rollHistory": []
+}
