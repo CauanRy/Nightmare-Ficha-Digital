@@ -8,8 +8,8 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>NIGHTMARE — Grimório Digital</title>
-  <link rel="stylesheet" href="theme.css?v=16">
-  <link rel="stylesheet" href="style.css?v=16">
+  <link rel="stylesheet" href="theme.css?v=20">
+  <link rel="stylesheet" href="style.css?v=20">
 </head>
 <body>
   <div class="ambient" aria-hidden="true"></div>
@@ -25,6 +25,7 @@
       <button id="importBtn" class="btn ghost">Importar</button>
       <button id="resetBtn" class="btn danger">Resetar</button>
       <input id="importFile" type="file" accept="application/json,.json" hidden>
+      <input id="characterPhotoFile" type="file" accept="image/png,image/jpeg,image/webp" hidden>
     </div>
   </header>
 
@@ -49,6 +50,17 @@
       <div class="dialog-actions"><button value="close" class="btn">Fechar</button></div>
     </form>
   </dialog>
-  <script src="script.js?v=16"></script>
+  <dialog id="cropDialog" class="crop-dialog">
+    <form method="dialog" class="dialog-card crop-card">
+      <div class="crop-heading"><div><small>RETRATO DO PERSONAGEM</small><h2>Ajustar foto</h2></div><p>Arraste a imagem e use o controle de zoom.</p></div>
+      <div id="cropViewport" class="crop-viewport" aria-label="Área de recorte da fotografia">
+        <img id="cropImage" alt="Prévia da fotografia para recorte" draggable="false">
+        <span class="crop-guides" aria-hidden="true"></span>
+      </div>
+      <label class="crop-zoom"><span>Zoom</span><input id="cropZoom" type="range" min="1" max="3" step="0.01" value="1"></label>
+      <div class="dialog-actions"><button id="cancelCrop" value="cancel" class="btn ghost">Cancelar</button><button id="applyCrop" type="button" class="btn">Aplicar recorte</button></div>
+    </form>
+  </dialog>
+  <script src="script.js?v=20"></script>
 </body>
 </html>

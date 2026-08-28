@@ -3,124 +3,164 @@ const vm = require("vm");
 const assert = require("assert");
 
 const source = fs.readFileSync("script.js", "utf8").replace(/renderApp\(\);\s*$/, "");
-const element = { addEventListener() {}, textContent: "", value: "", append() {}, click() {} };
+const element = { addEventListener() {}, textContent: "", value: "", append() {}, click() {}, classList: { toggle() {} } };
 const store = new Map();
 const context = {
   console,
   setTimeout: () => 0,
   clearTimeout() {},
   localStorage: { getItem: k => store.get(k) || null, setItem: (k, v) => store.set(k, v), removeItem: k => store.delete(k) },
-  document: { querySelectorAll: () => [], querySelector: () => null, getElementById: () => element, addEventListener() {}, createElement: () => ({ ...element, classList: { toggle() {} } }) },
+  document: { querySelectorAll: () => [], querySelector: () => null, getElementById: () => element, addEventListener() {}, createElement: () => ({ ...element }) },
   URL: { createObjectURL: () => "blob:test", revokeObjectURL() {} },
-  Blob: class {},
-  Intl,
+  Blob: class {}, Intl,
 };
 context.window = { addEventListener() {} };
 vm.createContext(context);
 vm.runInContext(source, context);
 const R = context.window.NightmareRules;
+let assertions = 0;
+const eq = (actual, expected, message) => { assertions++; assert.equal(actual, expected, message); };
+const ok = (value, message) => { assertions++; assert.ok(value, message); };
+const deep = (actual, expected, message) => { assertions++; assert.deepEqual(actual, expected, message); };
 
-const sheet = {
-  identity: { race: "Humano", className: "Arcanista", existence: "Pessoa Normal" },
-  racialConfig: { primary: "forca", secondary: "destreza" },
-  attributes: { forca: 3, destreza: 0, constituicao: 0, inteligencia: 3, arcanismo: 5, carisma: 0 },
-  abilities: [
-    { type: "Ativa", enabled: true, effectMode: "whenEnabled", attributeBonuses: [{ attribute: "destreza", value: 3 }] },
-    { type: "Passiva", enabled: false, effectMode: "always", attributeBonuses: [{ attribute: "forca", value: 1 }] },
-  ],
-  modifications: [{ enabled: true, attributeBonuses: [{ attribute: "destreza", value: 2 }] }],
-  anomalies: [],
-  inventory: { equipment: [] },
-};
+function sheet({ className="Combatente", existence="Desperto", race="Golem", attributes={}, progression, abilities=[], spells=[], modifications=[], equipment=[], anomalies=[], skills, status, combatState }={}) {
+  return R.hydrate({
+    schemaVersion: 9,
+    identity: { className, existence, race },
+    racialConfig: { primary: "forca", secondary: "destreza", hybridRaces: ["Humano", "Receptáculo"] },
+    attributes: { forca:0, destreza:0, constituicao:0, inteligencia:0, arcanismo:0, carisma:0, ...attributes },
+    progression: progression || { className, currentTier:R.tierIndex(existence), hpSnapshots:[], manaSnapshots:[], inferred:false },
+    abilities, spells, modifications, anomalies,
+    inventory: { equipment }, skills, status, combatState,
+  });
+}
 
-let attrs = R.effectiveAttributesFor(sheet);
-assert.equal(attrs.forca, 6, "bônus racial + passiva devem somar");
-assert.equal(attrs.destreza, 5, "duas fontes simultâneas devem somar");
-assert.equal(R.classManaFormula("Arcanista", "Pessoa Normal", attrs), 25);
-assert.equal(R.classManaFormula("Arcanista", "Super-Humano", attrs), 35);
-assert.equal(8 + attrs.arcanismo + 5, 18, "DP do primeiro patamar");
-assert.equal(10 + attrs.inteligencia, 13, "Sanidade base");
-
-sheet.abilities[0].enabled = false;
-attrs = R.effectiveAttributesFor(sheet);
-assert.equal(attrs.destreza, 2, "desligar deve remover somente a habilidade ativa");
-
-sheet.anomalies = [{ active: true, effects: [{ target: "Sanidade", mode: "percent", value: -50 }] }];
-assert.equal(R.calculateEffectValue(sheet, "Sanidade", 13), 6, "percentual deve arredondar para baixo");
-
-const reaction = { cycle: "4º Ciclo", action: "Reação", type: "Reação", manaCostOverride: null };
-assert.equal(R.spellCost(reaction), 16, "reação deve dobrar custo de 4º ciclo");
-assert.equal(R.spellCost({ cycle: "6º Ciclo", action: "Ação Padrão", type: "Técnica", manaCostOverride: null }, { transcribed: true }), 7, "Transcrição de 15 deve custar 7");
-assert.equal(R.roundDown(3 * 1.5), 4, "Recitação de duração deve arredondar para baixo");
-
-const migrated = R.hydrate({ schemaVersion: 1, identity: { className: "Combatente", race: "Humano", existence: "Pessoa Normal" }, status: { hpBaseMax: 20, manaBaseMax: 10 }, abilities: [{ id: "old", type: "Ativa" }] });
-assert.equal(migrated.schemaVersion, 7);
-assert.equal(migrated.abilities[0].type, "Técnica", "Ativa v1 deve migrar para Técnica");
-assert.ok(Array.isArray(migrated.abilities[0].attributeBonuses));
-assert.ok(Array.isArray(migrated.abilities[0].statusBonuses));
-assert.equal(migrated.status.hpBonus, 0);
-assert.equal(migrated.status.manaBonus, 0);
-
-const vampire = R.hydrate({
-  schemaVersion: 6,
-  identity: { race: "Vampiro", className: "Combatente", existence: "Pessoa Normal" },
-  racialConfig: { abilityBonuses: { "race-vamp-minor": [{ attribute: "destreza", value: 2 }, { attribute: "carisma", value: 3 }] } },
-  attributes: { forca: 0, destreza: 1, constituicao: 0, inteligencia: 0, arcanismo: 0, carisma: 1 },
-  abilities: [], modifications: [], anomalies: [], inventory: { equipment: [] }
+const patamares = [
+  ["Desperto",5,5,9], ["Super-Humano",7,7,12], ["Catástrofe",10,10,16],
+  ["Ascendente",15,15,24], ["Entidade",20,20,32], ["Entidade Verdadeira",25,25,40],
+];
+patamares.forEach(([name,max,prof,movement],i)=>{
+  eq(R.patamares[i].name,name,`nome oficial ${i}`);
+  eq(R.patamares[i].max,max,`limite de ${name}`);
+  eq(R.patamares[i].prof,prof,`proficiência de ${name}`);
+  eq(R.movementBaseFormula(name),movement,`deslocamento de ${name}`);
 });
-assert.equal(R.effectiveAttributesFor(vampire).destreza, 3, "bônus racial configurável deve usar o atributo salvo");
-assert.equal(R.effectiveAttributesFor(vampire).carisma, 4, "cada entrada racial deve preservar seu próprio valor");
-const vampireRoundTrip = R.hydrate(JSON.parse(JSON.stringify(vampire)));
-assert.equal(R.racialAbilityBonusesFor(vampireRoundTrip, "race-vamp-minor")[1].attribute, "carisma", "configuração racial deve persistir em JSON");
 
-const weapon = { autoHit: false, canCrit: true, criticalMargin: 17, bonus: 5 };
-assert.equal(R.attackHitOutcome(weapon, 5, 16).critical, false, "natural 16 não é crítico com margem 17");
-assert.equal(R.attackHitOutcome(weapon, 5, 17).critical, true, "natural 17 é crítico com margem 17");
-assert.equal(R.attackHitOutcome(weapon, 5, 18).critical, true, "natural 18 é crítico com margem 17");
-assert.equal(R.attackHitOutcome(weapon, 5, 19).critical, true, "natural 19 é crítico com margem 17");
-assert.equal(R.attackHitOutcome(weapon, 5, 20).critical, true, "natural 20 é crítico com margem 17");
-assert.equal(R.attackHitOutcome(weapon, 5, 16).total, 26, "total deve manter natural e modificadores separados");
-assert.equal(R.attackHitOutcome({ ...weapon, bonus: 50 }, 5, 16).critical, false, "bônus alto não pode transformar natural 16 em crítico");
-assert.equal(R.criticalMargin({}), 20, "arma antiga sem margem deve usar fallback 20");
-const legacyWeapon = R.hydrate({ schemaVersion: 1, identity: { race: "Humano", className: "Combatente", existence: "Pessoa Normal" }, inventory: { equipment: [{ id: "old-sword", attack: { damage: "1d6", attribute: "forca", bonus: 0, canCrit: true } }] } });
-assert.equal(R.criticalMargin(legacyWeapon.inventory.equipment[0].attack), 20, "equipamento antigo sem campo de margem deve continuar válido");
+const combatente = sheet({attributes:{constituicao:5}});
+eq(R.derivedStatusFor(combatente).hpMax,30,"Combatente Desperto CON 5");
+R.applyPatamarChange(combatente,"Super-Humano");
+eq(combatente.progression.hpSnapshots[0],5,"ascensão captura Constituição anterior");
+eq(R.derivedStatusFor(combatente).hpMax,60,"Combatente ascendido mantendo CON 5");
+combatente.attributes.constituicao=7;
+eq(R.derivedStatusFor(combatente).hpMax,64,"Combatente aumenta CON só no Patamar atual");
+const combatenteReload=R.hydrate(JSON.parse(JSON.stringify(combatente)));
+eq(R.derivedStatusFor(combatenteReload).hpMax,64,"recarregar não duplica Vida");
+eq(combatenteReload.progression.hpSnapshots.length,1,"snapshot não duplica");
 
-const statusSheet = R.hydrate({
-  schemaVersion: 7,
-  identity: { race: "Humano", className: "Combatente", existence: "Pessoa Normal" },
-  racialConfig: { abilityBonuses: { "race-Humano-versatile": [{ attribute: "forca", value: 2 }] } },
-  attributes: { forca: 0, destreza: 3, constituicao: 0, inteligencia: 0, arcanismo: 0, carisma: 0 },
-  status: { hpCurrent: 7, manaCurrent: 4, sanityCurrent: 0, traumaCurrent: 0, movement: 9, acBonus: 0, initiativeBonus: 0 },
-  abilities: [{ id: "a", type: "Ativa", enabled: true, effectMode: "whenEnabled", attributeBonuses: [], statusBonuses: [{ target: "Vida", value: 5 }, { target: "Mana", value: 5 }, { target: "CA", value: 2 }] }],
-  modifications: [{ id: "m", enabled: true, statusBonuses: [{ target: "Vida", value: 3 }, { target: "Sanidade", value: 4 }] }],
-  inventory: { equipment: [{ id: "e", equipped: true, statusBonuses: [{ target: "Mana", value: 2 }, { target: "Iniciativa", value: 2 }, { target: "Velocidade", value: 3 }] }] },
-  anomalies: []
+const arcanista = sheet({className:"Arcanista",attributes:{constituicao:5,arcanismo:5}});
+eq(R.derivedStatusFor(arcanista).hpMax,15,"Arcanista Desperto CON 5");
+eq(R.derivedStatusFor(arcanista).manaMax,20,"Arcanista Desperto Arcanismo 5");
+R.applyPatamarChange(arcanista,"Super-Humano");
+eq(R.derivedStatusFor(arcanista).hpMax,30,"Arcanista ascendido mantendo CON 5");
+eq(R.derivedStatusFor(arcanista).manaMax,40,"Arcanista ascendido mantendo Arcanismo 5");
+arcanista.attributes.constituicao=7;
+arcanista.attributes.arcanismo=7;
+eq(R.derivedStatusFor(arcanista).hpMax,32,"Arcanista aumenta CON só no Patamar atual");
+eq(R.derivedStatusFor(arcanista).manaMax,44,"Arcanista aumenta Arcanismo só no Patamar atual");
+
+const combatHpReference=[30,64,104,154,214,284];
+const arcaneHpReference=[15,32,52,77,107,142];
+const arcaneManaReference=[20,44,74,114,164,224];
+patamares.forEach(([existence,max],i)=>{
+  const previous=patamares.slice(0,i).map(x=>x[1]);
+  const c=sheet({existence,attributes:{constituicao:max},progression:{className:"Combatente",currentTier:i,hpSnapshots:previous,manaSnapshots:[],inferred:false}});
+  const a=sheet({className:"Arcanista",existence,attributes:{constituicao:max,arcanismo:max},progression:{className:"Arcanista",currentTier:i,hpSnapshots:previous,manaSnapshots:previous,inferred:false}});
+  eq(R.derivedStatusFor(c).hpMax,combatHpReference[i],`Vida Combatente ${existence}`);
+  eq(R.derivedStatusFor(a).hpMax,arcaneHpReference[i],`Vida Arcanista ${existence}`);
+  eq(R.derivedStatusFor(a).manaMax,arcaneManaReference[i],`Mana Arcanista ${existence}`);
+  eq(R.derivedStatusFor(c).manaMax,10*(i+1),`Mana Combatente ${existence}`);
 });
-let derived = R.derivedStatusFor(statusSheet);
-assert.equal(derived.acBase, 13, "C3 deve ser interpretado como Destreza efetiva na CA");
-assert.equal(derived.ac, 15, "CA deve somar bônus de fonte ativa");
-assert.equal(derived.hpMax, 28, "Vida deve somar fontes independentes");
-assert.equal(derived.manaMax, 17, "Mana deve somar habilidade e equipamento");
-assert.equal(derived.sanityMax, 14, "Sanidade deve receber bônus estruturado");
-assert.equal(derived.initiative, 5, "Iniciativa deve usar Destreza + bônus");
-assert.equal(derived.movement, 12, "Deslocamento deve aceitar bônus estruturado");
-assert.equal(derived.traumaMax, 3, "Trauma deve possuir limite fixo 3");
-assert.equal(statusSheet.status.traumaCurrent, 0, "Sanidade zero não deve conceder Trauma automaticamente");
-assert.equal(statusSheet.status.hpCurrent, 7, "alterar máximo de Vida não deve restaurar Vida atual");
-assert.equal(statusSheet.status.manaCurrent, 4, "alterar máximo de Mana não deve restaurar Mana atual");
-statusSheet.abilities[0].enabled = false;
-derived = R.derivedStatusFor(statusSheet);
-assert.equal(derived.ac, 13, "desativar habilidade deve remover somente seu bônus de CA");
-assert.equal(derived.hpMax, 23, "remover uma fonte deve preservar bônus de outra");
-assert.equal(derived.manaMax, 12, "equipamento deve continuar concedendo Mana após habilidade desligada");
-assert.equal(derived.initiative, 5, "fonte de Iniciativa independente deve permanecer");
 
-const con5 = { constituicao: 5, arcanismo: 0 };
-assert.equal(R.classHpBaseByTier("Combatente", "Pessoa Normal"), 20);
-assert.equal(R.classHpBaseByTier("Combatente", "Super-Humano"), 40);
-assert.equal(R.classHpBaseByTier("Combatente", "Catástrofe"), 60);
-assert.equal(R.classHpFormula("Combatente", "Pessoa Normal", con5), 30, "Constituição entra uma vez na fórmula atual");
-assert.equal(R.classHpFormula("Combatente", "Super-Humano", con5), 50, "base acumula sem reaplicar Constituição por ascensão");
-assert.equal(R.movementBaseFormula("Super-Humano", 9), 9, "sem tabela oficial, Deslocamento-base deve ser preservado");
+const migrated=R.hydrate({schemaVersion:8,identity:{className:"Arcanista",race:"Humano",existence:"Pessoa Normal"},abilities:[{id:"old-a",type:"Ataque"}],spells:[{id:"old-s",type:"Ataque",cycle:"1º Ciclo"}],inventory:{equipment:[{id:"old-e"}]}});
+eq(migrated.schemaVersion,9,"schema migra para v9");
+eq(migrated.identity.existence,"Desperto","Pessoa Normal migra para Desperto");
+eq(migrated.abilities[0].type,"Técnica","habilidade Ataque migra para Técnica");
+eq(migrated.spells[0].type,"Técnica","magia Ataque migra para Técnica");
+eq(migrated.spells[0].magicNature,"Arcana","magia antiga recebe Arcana");
+ok(Array.isArray(migrated.inventory.equipment[0].immunities),"equipamento antigo recebe imunidades");
+const impossible=R.hydrate({schemaVersion:8,identity:{className:"Combatente",race:"Golem",existence:"Ser Impossível"},attributes:{constituicao:10}});
+eq(impossible.identity.existence,"Ascendente","Ser Impossível migra para Ascendente");
+ok(impossible.progression.inferred,"snapshot migrado é marcado como inferido");
+ok(impossible.progression.migrationNote.length>0,"migração guarda nota interna");
 
-console.log("rules-test: 50 assertions passed");
+const defenseSheet=sheet({attributes:{destreza:5,arcanismo:5,inteligencia:4},equipment:[{id:"armor",equipped:true,statusBonuses:[{target:"CA",value:3}],resistances:[{type:"Arcana",value:4}],immunities:[{type:"Veneno"}]}]});
+let derived=R.derivedStatusFor(defenseSheet);
+eq(derived.acBase,15,"CA base = 10 + Destreza");
+eq(derived.ac,18,"CA recebe +3 de armadura");
+eq(derived.dt,18,"DT = 8 + Arcanismo + Proficiência");
+eq(derived.initiative,5,"Iniciativa base = Destreza");
+eq(derived.sanityMax,14,"Sanidade = 10 + Inteligência");
+eq(derived.traumaMax,3,"Trauma base permanece 3");
+deep(derived.resistances.map(x=>[x.type,x.value]),[["Arcana",4]],"resistência explícita");
+deep(derived.immunities,["Veneno"],"imunidade explícita");
+
+const skillSheet=sheet({attributes:{destreza:4,constituicao:3,arcanismo:5},skills:{Acrobacia:{attribute:"destreza",proficient:true,extra:2},Atletismo:{attribute:"constituicao",proficient:true,extra:0}}});
+eq(R.skillBonusFor(skillSheet,"Acrobacia",false).total,7,"perícia normal só Proficiência + Extra");
+eq(R.skillBonusFor(skillSheet,"Acrobacia",true).total,11,"resistência inclui atributo selecionado");
+eq(R.skillBonusFor(skillSheet,"Atletismo",true).total,8,"Atletismo pode usar Constituição");
+eq(R.attackModifierFor(skillSheet,{attribute:"destreza",bonus:2},false).total,11,"ataque físico soma atributo + Proficiência");
+const magical=R.attackModifierFor(skillSheet,{attribute:"forca",bonus:0},true);
+eq(magical.attribute,"arcanismo","ataque mágico usa Arcanismo");
+eq(magical.total,10,"ataque mágico soma Proficiência");
+
+const costs={"1º Ciclo":2,"2º Ciclo":3,"3º Ciclo":6,"4º Ciclo":8,"5º Ciclo":16,"6º Ciclo":32,"7º Ciclo":60,"8º Ciclo":85,"9º Ciclo":120};
+Object.entries(costs).forEach(([cycle,cost])=>eq(R.baseSpellCost({cycle,manaCostOverride:null}),cost,`custo ${cycle}`));
+const ninth={cycle:"9º Ciclo",action:"Ação Padrão",type:"Técnica",manaCostOverride:null,recitation:{allowed:true}};
+eq(R.spellCost(ninth,{recited:true}),180,"Recitação 9º custa 180");
+eq(R.spellCost(ninth,{transcribed:true}),60,"Transcrição 9º custa 60");
+eq(R.spellCost({...ninth,action:"Reação"}),240,"Reação 9º custa 240");
+eq(R.spellCost({cycle:"8º Ciclo",action:"Ação Padrão",type:"Técnica",manaCostOverride:null,recitation:{allowed:true}},{recited:true}),127,"Recitação 85 arredonda para 127");
+eq(R.roundDown(3*1.5),4,"duração recitada arredonda para baixo");
+
+deep(R.uniqueLevelOptions("Desperto"),["Extra"],"Única Desperto");
+deep(R.uniqueLevelOptions("Super-Humano"),["Extra","Especial"],"Única Super-Humano");
+deep(R.uniqueLevelOptions("Entidade Verdadeira"),["Definitiva"],"Única final");
+const levelSheet=sheet({abilities:[{id:"u",name:"Única",level:"Extra",type:"Passiva",origins:["Única"]},{id:"l",name:"Exceção",level:"Lendária",type:"Técnica",origins:["Adquirida"]}]});
+ok(R.abilityLevelWarning(levelSheet,levelSheet.abilities[1]).includes("Exceção narrativa"),"nível superior gera aviso não bloqueante");
+
+deep(R.normalizeHybridRaces(["Humano","Humano","Golem"]),["Humano","Golem"],"Híbrido remove duplicata");
+const hybrid=sheet({race:"Híbrido"});
+hybrid.racialConfig.hybridRaces=["Humano","Golem","Vampiro"];
+const hybridBonus=R.racialBonusesFor(hybrid);
+eq(hybridBonus.forca,9,"Híbrido soma bônus das três raças");
+eq(hybridBonus.destreza,2,"Híbrido preserva segundo bônus Vampiro");
+
+eq(R.resourcePercent(50,50),100,"barra cheia");
+eq(R.resourcePercent(25,50),50,"barra pela metade");
+eq(R.resourcePercent(0,50),0,"barra vazia");
+eq(R.resourcePercent(-5,50),0,"barra não fica negativa");
+eq(R.resourcePercent(70,50),100,"barra não passa 100%");
+const initialized=sheet();
+const initializedDerived=R.derivedStatusFor(initialized);
+eq(initialized.combatState.hpCurrent,initializedDerived.hpMax,"Vida inicial cheia");
+eq(initialized.combatState.manaCurrent,initializedDerived.manaMax,"Mana inicial cheia");
+const session=sheet({status:{hpBonus:20},combatState:{initialized:true,hpCurrent:25,manaCurrent:8,sanityCurrent:7,traumaCurrent:1,hpTemporary:10,manaTemporary:5,sanityTemporary:3}});
+session.status.hpBonus=30; R.syncCombatStateFor(session);
+eq(session.combatState.hpCurrent,25,"aumentar máximo não cura");
+eq(session.combatState.hpTemporary,10,"Vida temporária independente");
+const spend=R.manaSpendPlan(20,5,8);
+deep([spend.realCurrent,spend.temporaryCurrent,spend.temporarySpent,spend.realSpent],[17,0,5,3],"Mana temporária primeiro");
+eq(R.manaSpendPlan(2,3,6).canPay,false,"Mana insuficiente bloqueia");
+
+const weapon={autoHit:false,canCrit:true,criticalMargin:17,bonus:5};
+eq(R.attackHitOutcome(weapon,5,16).critical,false,"natural 16 não critica");
+eq(R.attackHitOutcome(weapon,5,17).critical,true,"natural 17 critica");
+eq(R.attackHitOutcome({...weapon,bonus:50},5,16).critical,false,"bônus não cria crítico");
+eq(R.criticalMargin({}),20,"ataque antigo usa margem 20");
+const photo="data:image/jpeg;base64,AA==";
+const photoSheet=R.hydrate({schemaVersion:9,identity:{photoDataUrl:photo,photoSourceDataUrl:photo,photoCrop:{sx:0,sy:0,sw:1,sh:1}}});
+eq(photoSheet.identity.photoDataUrl,photo,"foto persiste");
+eq(photoSheet.identity.photoCrop.sw,1,"crop persiste");
+eq(R.hydrate({schemaVersion:9,identity:{photoDataUrl:"https://example.com/x.jpg"}}).identity.photoDataUrl,"","URL externa rejeitada");
+
+console.log(`rules-test: ${assertions} assertions passed`);

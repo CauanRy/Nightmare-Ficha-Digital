@@ -1,15 +1,26 @@
-:root {
-  --void:#01050a; --night:#04101b; --ink:#071a29;
-  --grimoire-bg:#071d2d; --grimoire-panel:#0b2639; --grimoire-panel-raised:#10344a;
-  --paper:var(--grimoire-panel); --paper-2:var(--grimoire-panel-raised);
-  --arcane-blue:#2a86b7; --arcane-glow:#72d8ff; --silver-border:#6b91a8;
-  --line:#294e66; --line-bright:#568caf; --glow:var(--arcane-glow);
-  --text-primary:#e5f6ff; --cold:var(--text-primary); --muted:#91afbf;
-  --danger:#e37182; --success:#69dab7; --warning:#e8c272;
-  --radius-sm:3px; --radius-md:6px; --space-card:18px;
-  --shadow:0 20px 58px #000b; --arcane-shadow:0 0 24px #5fd3ff20;
-  --serif:Georgia,"Times New Roman",serif; --sans:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+:root{
+  --void:#03070c;--surface:#07131d;--surface-2:#0b1c29;--surface-3:#102a3a;
+  --text:#edf7fc;--muted:#91a9b7;--line:#27475a;--line-strong:#3d718b;
+  --accent:#2d91c3;--accent-bright:#70d7ff;--accent-soft:#49bde51c;
+  --danger:#ed6f83;--success:#64d7ad;--warning:#e8bf6b;
+  --shadow:0 18px 50px #0008;--radius:10px;--radius-sm:6px;
+  --sans:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --serif:Georgia,"Times New Roman",serif;color-scheme:dark;
 }
-*{box-sizing:border-box} html{color-scheme:dark;background:var(--void)}
-body{margin:0;color:var(--cold);font-family:var(--sans);background:radial-gradient(circle at 50% -15%,#164766 0,transparent 42%),radial-gradient(circle at 10% 55%,#0d2f4628 0,transparent 38%),linear-gradient(135deg,#01060b,#06131e 48%,#01070c);min-height:100vh}
-.ambient{position:fixed;inset:0;pointer-events:none;opacity:.28;background-image:linear-gradient(90deg,transparent 49.8%,#8bdfff08 50%,transparent 50.2%),repeating-linear-gradient(115deg,transparent 0 31px,#71cfff05 32px 33px),radial-gradient(circle at 80% 20%,#78d9ff44 0 1px,transparent 2px);background-size:100% 100%,auto,37px 37px}
+html[data-class-theme="arcanista"]{
+  --surface:#06131e;--surface-2:#092132;--surface-3:#103b52;
+  --line:#28566e;--line-strong:#4385a5;--accent:#258dc0;--accent-bright:#70d9ff;--accent-soft:#4bc8f31e;
+}
+html[data-class-theme="combatente"]{
+  --surface:#17090e;--surface-2:#251018;--surface-3:#461b28;
+  --line:#63303f;--line-strong:#96475b;--accent:#b43b58;--accent-bright:#ff849a;--accent-soft:#df49651d;
+  --muted:#bba0a8;
+}
+*{box-sizing:border-box}
+html{min-height:100%;background:var(--void)}
+body{min-height:100vh;margin:0;color:var(--text);font-family:var(--sans);background:
+  radial-gradient(circle at 50% -15%,color-mix(in srgb,var(--accent) 24%,transparent),transparent 42%),
+  linear-gradient(145deg,#020508,var(--surface) 55%,#020508)}
+.ambient{position:fixed;inset:0;pointer-events:none;opacity:.3;background:
+  linear-gradient(90deg,transparent 49.9%,color-mix(in srgb,var(--accent-bright) 7%,transparent) 50%,transparent 50.1%),
+  radial-gradient(circle at 82% 16%,color-mix(in srgb,var(--accent-bright) 24%,transparent) 0 1px,transparent 2px);background-size:100% 100%,42px 42px}
