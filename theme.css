@@ -8,8 +8,8 @@
   --serif:Georgia,"Times New Roman",serif;color-scheme:dark;
 }
 html[data-class-theme="arcanista"]{
-  --surface:#06131e;--surface-2:#092132;--surface-3:#103b52;
-  --line:#28566e;--line-strong:#4385a5;--accent:#258dc0;--accent-bright:#70d9ff;--accent-soft:#4bc8f31e;
+  --void:#02060a;--surface:#050d14;--surface-2:#081722;--surface-3:#0c2533;
+  --line:#1f4659;--line-strong:#356c84;--accent:#226e92;--accent-bright:#69c8e9;--accent-soft:#318eb218;
 }
 html[data-class-theme="combatente"]{
   --surface:#17090e;--surface-2:#251018;--surface-3:#461b28;

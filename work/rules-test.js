@@ -23,15 +23,15 @@ const eq = (actual, expected, message) => { assertions++; assert.equal(actual, e
 const ok = (value, message) => { assertions++; assert.ok(value, message); };
 const deep = (actual, expected, message) => { assertions++; assert.deepEqual(actual, expected, message); };
 
-function sheet({ className="Combatente", existence="Desperto", race="Golem", attributes={}, progression, abilities=[], spells=[], modifications=[], equipment=[], anomalies=[], skills, status, combatState }={}) {
+function sheet({ className="Combatente", existence="Desperto", race="Golem", profession="", professionSkill, attributes={}, progression, abilities=[], spells=[], tricks=[], modifications=[], equipment=[], anomalies=[], skills, status, combatState }={}) {
   return R.hydrate({
-    schemaVersion: 9,
-    identity: { className, existence, race },
+    schemaVersion: 10,
+    identity: { className, existence, race, profession },
     racialConfig: { primary: "forca", secondary: "destreza", hybridRaces: ["Humano", "Receptáculo"] },
     attributes: { forca:0, destreza:0, constituicao:0, inteligencia:0, arcanismo:0, carisma:0, ...attributes },
     progression: progression || { className, currentTier:R.tierIndex(existence), hpSnapshots:[], manaSnapshots:[], inferred:false },
-    abilities, spells, modifications, anomalies,
-    inventory: { equipment }, skills, status, combatState,
+    abilities, spells, tricks, modifications, anomalies,
+    inventory: { equipment }, skills, professionSkill, status, combatState,
   });
 }
 
@@ -82,7 +82,7 @@ patamares.forEach(([existence,max],i)=>{
 });
 
 const migrated=R.hydrate({schemaVersion:8,identity:{className:"Arcanista",race:"Humano",existence:"Pessoa Normal"},abilities:[{id:"old-a",type:"Ataque"}],spells:[{id:"old-s",type:"Ataque",cycle:"1º Ciclo"}],inventory:{equipment:[{id:"old-e"}]}});
-eq(migrated.schemaVersion,10,"schema migra para v10");
+eq(migrated.schemaVersion,11,"schema migra para v11");
 eq(migrated.identity.existence,"Desperto","Pessoa Normal migra para Desperto");
 eq(migrated.abilities[0].type,"Técnica","habilidade Ataque migra para Técnica");
 eq(migrated.spells[0].type,"Técnica","magia Ataque migra para Técnica");
@@ -107,10 +107,28 @@ eq(derived.traumaMax,3,"Trauma base permanece 3");
 deep(derived.resistances.map(x=>[x.type,x.value]),[["Arcana",4]],"resistência explícita");
 deep(derived.immunities,["Veneno"],"imunidade explícita");
 
-const skillSheet=sheet({attributes:{destreza:4,constituicao:3,arcanismo:5},skills:{Acrobacia:{attribute:"destreza",proficient:true,extra:2},Atletismo:{attribute:"constituicao",proficient:true,extra:0}}});
-eq(R.skillBonusFor(skillSheet,"Acrobacia",false).total,7,"perícia normal só Proficiência + Extra");
-eq(R.skillBonusFor(skillSheet,"Acrobacia",true).total,11,"resistência inclui atributo selecionado");
+const skillSheet=sheet({attributes:{destreza:4,constituicao:3,arcanismo:5,inteligencia:4},skills:{Acrobacia:{attribute:"destreza",proficient:true,extra:2},Atletismo:{attribute:"constituicao",proficient:true,extra:0}}});
+ok(!Object.hasOwn(skillSheet.skills,"Acrobacia"),"Acrobacia desaparece após a migração");
+eq(R.skillBonusFor(skillSheet,"Reflexo",false).total,7,"Reflexo preserva Proficiência e Extra de Acrobacia");
+eq(R.skillBonusFor(skillSheet,"Reflexo",true).total,11,"Reflexo pode incluir Destreza quando solicitado");
+eq(R.skillBonusFor(skillSheet,"Tecnologia",false).total,0,"Tecnologia não soma Inteligência automaticamente");
+eq(R.skillBonusFor(skillSheet,"Tecnologia",true).total,4,"Tecnologia inclui Inteligência somente quando solicitado");
 eq(R.skillBonusFor(skillSheet,"Atletismo",true).total,8,"Atletismo pode usar Constituição");
+const professional=sheet({profession:"Médico",professionSkill:{attribute:"inteligencia",proficient:true,extra:3}});
+eq(R.skillLabelFor(professional,"professionSkill"),"Médico","Profissão gera nome visual da Perícia");
+eq(R.skillBonusFor(professional,"professionSkill",false).total,8,"Perícia de Profissão usa dados estáveis");
+professional.identity.profession="Cirurgião";
+eq(R.skillLabelFor(professional,"professionSkill"),"Cirurgião","renomear Profissão altera só o rótulo");
+eq(R.skillBonusFor(professional,"professionSkill",false).total,8,"renomear Profissão preserva bônus e proficiência");
+professional.identity.profession="";
+ok(!R.skillEntriesFor(professional).some(x=>x.id==="professionSkill"),"Profissão vazia esconde a Perícia dinâmica");
+professional.identity.profession="Cirurgião";
+const professionalReload=R.hydrate(JSON.parse(JSON.stringify(professional)));
+eq(R.skillLabelFor(professionalReload,"professionSkill"),"Cirurgião","Perícia de Profissão sobrevive a exportação e importação");
+eq(R.skillBonusFor(professionalReload,"professionSkill",false).total,8,"dados da Profissão sobrevivem ao recarregamento");
+const spellSkillMigration=R.hydrate({schemaVersion:10,identity:{},spells:[{id:"save-old",cycle:"1º Ciclo",saveTarget:"Acrobacia",save:{enabled:true,skill:"Acrobacia"}}]});
+eq(spellSkillMigration.spells[0].saveTarget,"Reflexo","referência antiga de Magia migra para Reflexo");
+eq(spellSkillMigration.spells[0].save.skill,"Reflexo","Teste estruturado antigo migra para Reflexo");
 eq(R.attackModifierFor(skillSheet,{attribute:"destreza",bonus:2},false).total,11,"ataque físico soma atributo + Proficiência");
 const magical=R.attackModifierFor(skillSheet,{attribute:"forca",bonus:0},true);
 eq(magical.attribute,"arcanismo","ataque mágico usa Arcanismo");
@@ -196,75 +214,31 @@ eq(R.spellCost({...reactionSpell,manaCostOverride:1},{transcribed:true}),1,"Tran
 const completeSheet=sheet();
 ok(R.canSpendAction(completeSheet,"Ação Completa"),"Ação Completa disponível com todas as ações");
 R.spendAction(completeSheet,"Ação Completa");
-deep(Object.values(completeSheet.combatState.actions),[false,false,false,false,false],"Ação Completa consome inclusive Reação");
-const turn=R.beginOwnTurn(completeSheet);
-deep(Object.values(completeSheet.combatState.actions),[true,true,true,true,true],"início do turno recupera todas as ações");
-eq(turn.ownTurns,1,"turno próprio é contado separadamente");
-eq(R.beginRound(completeSheet),2,"rodada coletiva avança separadamente");
+deep(Object.values(completeSheet.combatState.actions),[false,false,false,false,false],"guia manual de Ação Completa marca todas como gastas");
 
 const dying=sheet();
-const fullHp=R.derivedStatusFor(dying).hpMax;
-const fatal=R.applyDamageToState(dying,fullHp);
-ok(fatal.dying,"Vida 0 ativa Morrendo");
-eq(dying.combatState.deathMarkers,3,"Morrendo começa com três marcadores");
-ok(fatal.massive,"dano de pelo menos metade registra dano massivo");
-R.beginOwnTurn(dying);eq(dying.combatState.deathMarkers,2,"turno próprio remove um marcador");
-R.beginOwnTurn(dying);eq(dying.combatState.deathMarkers,1,"segundo turno remove outro marcador");
-R.beginOwnTurn(dying);ok(dying.combatState.dead,"zero marcadores causa morte");
-
-const healing=sheet();R.applyDamageToState(healing,R.derivedStatusFor(healing).hpMax);
-const commonHealing=R.applyHealingToState(healing,2);
-eq(commonHealing.removedDying,false,"cura comum não remove Morrendo");
-ok(healing.combatState.dying,"continua Morrendo após cura comum");
-const majorHealing=R.applyHealingToState(healing,R.derivedStatusFor(healing).hpMax/2);
-eq(majorHealing.removedDying,true,"cura de 50% remove Morrendo");
-eq(healing.combatState.hpCurrent,1,"cura grande retorna com exatamente 1 Vida");
-const structured=sheet();R.applyDamageToState(structured,R.derivedStatusFor(structured).hpMax);R.applyHealingToState(structured,1,{removesDying:true});
-ok(!structured.combatState.dying,"efeito estruturado removesDying remove o estado");
-const structuredFull=sheet();R.applyDamageToState(structuredFull,R.derivedStatusFor(structuredFull).hpMax);R.applyHealingToState(structuredFull,6,{removesDying:true});
-eq(structuredFull.combatState.hpCurrent,6,"Remove Morrendo aplica a cura indicada normalmente");
-
-const saveSheet=sheet({attributes:{constituicao:3},skills:{Sobrevivência:{attribute:"inteligencia",proficient:true,extra:2}}});
-R.applyDamageToState(saveSheet,R.derivedStatusFor(saveSheet).hpMax);
-const saveBonus=R.dyingCheckBonus(saveSheet);
-eq(saveBonus.total,10,"teste em Morrendo soma Sobrevivência e Constituição");
-ok(R.resolveConsciousnessCheck(saveSheet,20,999).success,"consciência aceita 20 natural");
-eq(saveSheet.combatState.conscious,true,"sucesso mantém consciência separada de Morrendo");
-ok(R.resolveDyingActionCheck(saveSheet,20,999).success,"20 natural é sucesso automático");
-const beforeMarker=saveSheet.combatState.deathMarkers;
-const failed=R.resolveDyingActionCheck(saveSheet,1,999);
-ok(!failed.success,"falha contra DT manual é detectada");
-eq(saveSheet.combatState.deathMarkers,beforeMarker-1,"falha remove marcador");
-const medicine=sheet({skills:{Medicina:{attribute:"inteligencia",proficient:true,extra:2}}});R.applyDamageToState(medicine,R.derivedStatusFor(medicine).hpMax);
-eq(R.resolveStabilization(medicine,10,17,true).total,17,"Medicina treinada usa Proficiência + Extra, sem atributo automático");
-ok(R.resolveStabilization(medicine,20,999,false).success,"Medicina sem treino aceita 20 natural");
-eq(medicine.combatState.hpCurrent,1,"estabilização retorna com 1 Vida");
+R.setDyingManual(dying,true);
+ok(dying.combatState.dying,"Morrendo pode ser ativado manualmente");
+eq(dying.combatState.deathMarkers,3,"ativar Morrendo mostra três marcadores");
+eq(R.setDeathMarkersManual(dying,2),2,"marcador pode ser removido manualmente");
+eq(R.setDeathMarkersManual(dying,3),3,"marcador pode ser restaurado manualmente");
+R.setDyingManual(dying,false);
+ok(!dying.combatState.dying,"Morrendo pode ser desativado manualmente");
+eq(dying.combatState.deathMarkers,3,"desativar Morrendo restaura três marcadores");
 
 eq(R.criticalDamageExpression("2d8 + 5",3),"6d8 + 5","crítico multiplica só os dados na expressão");
 const criticalRoll=R.parseDice("2d6+5",3);
 ok(criticalRoll.total>=11&&criticalRoll.total<=41,"dados x3 e bônus fixo uma vez");
 ok(criticalRoll.detail.includes("6d6"),"detalhe mostra dados multiplicados");
 
-eq(R.resurrectionValidation({function:"Ressurreição",cycle:"8º Ciclo",masterAuthorized:true}).valid,false,"Ressurreição abaixo do 9º ciclo é inválida");
-eq(R.resurrectionValidation({function:"Ressurreição",cycle:"9º Ciclo",masterAuthorized:false}).valid,false,"Ressurreição exige mestre");
-ok(R.resurrectionValidation({function:"Ressurreição",cycle:"9º Ciclo",masterAuthorized:true}).valid,"Ressurreição de 9º autorizada é válida");
-eq(R.spellValidation({function:"Cura",cycle:"2º Ciclo",removesDying:true,masterAuthorized:false}).valid,false,"Remove Morrendo é bloqueado antes do 3º ciclo");
-ok(R.spellValidation({function:"Cura",cycle:"3º Ciclo",removesDying:true,masterAuthorized:false}).valid,"Remove Morrendo é permitido no 3º ciclo");
-ok(R.spellValidation({function:"Cura",cycle:"3º Ciclo",removesDying:true,masterAuthorized:false}).message.includes("pendente"),"custo de OM de Remove Morrendo permanece pendente");
-
-const sustaining=sheet({attributes:{arcanismo:5}});
-sustaining.combatState.sustain={spellId:"active",allowActions:true,ignoreConcentration:false,dc:30};
-const failedSustain=R.resolveSustainCheck(sustaining,1,30);
-ok(!failedSustain.success,"falha de Arcanismo encerra Sustentação");
-eq(sustaining.combatState.sustain.spellId,"","Sustentação é limpa na falha");
-sustaining.combatState.sustain={spellId:"active",allowActions:true,ignoreConcentration:false,dc:999};
-ok(R.resolveSustainCheck(sustaining,20,999).success,"20 natural mantém Sustentação");
-sustaining.combatState.sustain={spellId:"active",allowActions:true,ignoreConcentration:false,dc:20};
-ok(R.applyDamageToState(sustaining,1).sustainPerturbed,"dano marca perturbação sem inventar DT");
-
 const unknown=R.hydrate({schemaVersion:9,identity:{name:"Legado",customIdentity:"fica"},customRoot:{preserve:true},spells:[{id:"legacy",cycle:"1º Ciclo",unknownField:42}]});
 eq(unknown.customRoot.preserve,true,"migração preserva campo raiz desconhecido");
 eq(unknown.identity.customIdentity,"fica","migração preserva campo de identidade desconhecido");
 eq(unknown.spells[0].unknownField,42,"migração preserva campo de magia desconhecido");
+ok(!source.includes("ORÇAMENTO MÁGICO"),"auditor de OM não aparece na interface");
+ok(!source.includes('data-action="apply-damage"'),"controle redundante de aplicar dano foi removido");
+ok(!source.includes('data-action="apply-healing"'),"controle redundante de aplicar cura foi removido");
+ok(!source.includes('data-action="begin-turn"'),"gerenciador automático de turnos foi removido");
+ok(!source.includes('data-action="begin-round"'),"rastreador de rodadas foi removido");
 
 console.log(`rules-test: ${assertions} assertions passed`);
