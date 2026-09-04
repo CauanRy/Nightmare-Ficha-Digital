@@ -98,7 +98,7 @@ Validado em viewport de 375 × 812 px. `innerWidth` ficou em 375 px e `document.
 
 ## 20. PUBLICAÇÃO
 
-Versão v11 preparada e validada para publicação na branch principal de `CauanRy/Nightmare-Ficha-Digital` e no GitHub Pages em `https://cauanry.github.io/Nightmare-Ficha-Digital/`.
+Versão v11 publicada na branch principal de `CauanRy/Nightmare-Ficha-Digital` e validada no GitHub Pages em `https://cauanry.github.io/Nightmare-Ficha-Digital/`. A implementação foi publicada inicialmente no commit remoto `0aa946da55d61f10b7cd13bfd997bae5052a62b9`.
 
 ## 21. PENDÊNCIAS REAIS
 
