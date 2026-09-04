@@ -59,25 +59,40 @@ eq(combatenteReload.progression.hpSnapshots.length,1,"snapshot não duplica");
 
 const arcanista = sheet({className:"Arcanista",attributes:{constituicao:5,arcanismo:5}});
 eq(R.derivedStatusFor(arcanista).hpMax,15,"Arcanista Desperto CON 5");
-eq(R.derivedStatusFor(arcanista).manaMax,20,"Arcanista Desperto Arcanismo 5");
+eq(R.derivedStatusFor(arcanista).manaMax,30,"Arcanista Desperto Arcanismo 5");
 R.applyPatamarChange(arcanista,"Super-Humano");
 eq(R.derivedStatusFor(arcanista).hpMax,30,"Arcanista ascendido mantendo CON 5");
-eq(R.derivedStatusFor(arcanista).manaMax,40,"Arcanista ascendido mantendo Arcanismo 5");
+eq(R.derivedStatusFor(arcanista).manaMax,60,"Arcanista ascendido mantendo Arcanismo 5");
 arcanista.attributes.constituicao=7;
 arcanista.attributes.arcanismo=7;
 eq(R.derivedStatusFor(arcanista).hpMax,32,"Arcanista aumenta CON só no Patamar atual");
-eq(R.derivedStatusFor(arcanista).manaMax,44,"Arcanista aumenta Arcanismo só no Patamar atual");
+eq(R.derivedStatusFor(arcanista).manaMax,64,"Arcanista aumenta Arcanismo só no Patamar atual");
+
+const arcanistaZero = sheet({className:"Arcanista",attributes:{arcanismo:0}});
+eq(R.derivedStatusFor(arcanistaZero).manaMax,20,"Arcanista Desperto Arcanismo 0");
+eq(R.classManaFormula("Arcanista","Desperto",{arcanismo:0}),20,"fórmula direta usa base 20");
+const snapshotMana = sheet({className:"Arcanista",existence:"Super-Humano",attributes:{arcanismo:7},progression:{className:"Arcanista",currentTier:1,hpSnapshots:[0],manaSnapshots:[5],inferred:false}});
+eq(R.derivedStatusFor(snapshotMana).manaMax,64,"Super-Humano usa snapshot ARC 5 e ARC atual 7");
+snapshotMana.attributes.arcanismo=9;
+eq(R.derivedStatusFor(snapshotMana).manaMax,68,"novo Arcanismo afeta somente o Patamar atual");
+eq(snapshotMana.progression.manaSnapshots[0],5,"editar Arcanismo não recalcula snapshot anterior");
+const snapshotReload=R.hydrate(JSON.parse(JSON.stringify(snapshotMana)));
+eq(R.derivedStatusFor(snapshotReload).manaMax,68,"exportação e importação preservam cálculo e snapshot");
+eq(snapshotReload.progression.manaSnapshots[0],5,"exportação e importação preservam snapshot histórico");
 
 const combatHpReference=[30,64,104,154,214,284];
 const arcaneHpReference=[15,32,52,77,107,142];
-const arcaneManaReference=[20,44,74,114,164,224];
+const arcaneManaReference=[30,64,104,154,214,284];
+const arcaneManaMinimum=[20,40,60,80,100,120];
 patamares.forEach(([existence,max],i)=>{
   const previous=patamares.slice(0,i).map(x=>x[1]);
   const c=sheet({existence,attributes:{constituicao:max},progression:{className:"Combatente",currentTier:i,hpSnapshots:previous,manaSnapshots:[],inferred:false}});
   const a=sheet({className:"Arcanista",existence,attributes:{constituicao:max,arcanismo:max},progression:{className:"Arcanista",currentTier:i,hpSnapshots:previous,manaSnapshots:previous,inferred:false}});
+  const minimum=sheet({className:"Arcanista",existence,attributes:{arcanismo:0},progression:{className:"Arcanista",currentTier:i,hpSnapshots:Array(i).fill(0),manaSnapshots:Array(i).fill(0),inferred:false}});
   eq(R.derivedStatusFor(c).hpMax,combatHpReference[i],`Vida Combatente ${existence}`);
   eq(R.derivedStatusFor(a).hpMax,arcaneHpReference[i],`Vida Arcanista ${existence}`);
   eq(R.derivedStatusFor(a).manaMax,arcaneManaReference[i],`Mana Arcanista ${existence}`);
+  eq(R.derivedStatusFor(minimum).manaMax,arcaneManaMinimum[i],`Mana mínima Arcanista ${existence}`);
   eq(R.derivedStatusFor(c).manaMax,10*(i+1),`Mana Combatente ${existence}`);
 });
 
@@ -169,6 +184,10 @@ const session=sheet({status:{hpBonus:20},combatState:{initialized:true,hpCurrent
 session.status.hpBonus=30; R.syncCombatStateFor(session);
 eq(session.combatState.hpCurrent,25,"aumentar máximo não cura");
 eq(session.combatState.hpTemporary,10,"Vida temporária independente");
+const manaSession=sheet({className:"Arcanista",attributes:{arcanismo:5},combatState:{initialized:true,hpCurrent:10,manaCurrent:7,sanityCurrent:10,traumaCurrent:0}});
+manaSession.attributes.arcanismo=7; R.syncCombatStateFor(manaSession);
+eq(R.derivedStatusFor(manaSession).manaMax,34,"aumentar Arcanismo aumenta a Mana máxima corrigida");
+eq(manaSession.combatState.manaCurrent,7,"aumentar Mana máxima não restaura Mana atual");
 const spend=R.manaSpendPlan(20,5,8);
 deep([spend.realCurrent,spend.temporaryCurrent,spend.temporarySpent,spend.realSpent],[17,0,5,3],"Mana temporária primeiro");
 eq(R.manaSpendPlan(2,3,6).canPay,false,"Mana insuficiente bloqueia");

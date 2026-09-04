@@ -193,9 +193,9 @@ function constructionLimit(){return EXISTENCE[state.identity.existence]?.max??5}
 function tierIndex(existence){return Math.max(0,PATAMARES.findIndex(x=>x.name===(LEGACY_PATAMAR[existence]||existence)))}
 function classHpBaseByTier(className,existence){return (className==="Arcanista"?10:20)*(tierIndex(existence)+1)}
 function classHpFormula(className,existence,attrs){if(typeof existence==="object"){attrs=existence;existence="Desperto"}attrs=attrs||{};const packages=tierIndex(existence)+1,multiplier=className==="Arcanista"?1:2;return packages*((className==="Arcanista"?10:20)+multiplier*num(attrs.constituicao))}
-function classManaFormula(className,existence,attrs){const packages=tierIndex(existence)+1;return className==="Arcanista"?packages*(10+2*num(attrs?.arcanismo)):packages*10}
+function classManaFormula(className,existence,attrs){const packages=tierIndex(existence)+1;return className==="Arcanista"?packages*(20+2*num(attrs?.arcanismo)):packages*10}
 function progressionClassHp(source,attrs){const idx=tierIndex(source.identity.existence),p=ensureProgressionState(source),base=source.identity.className==="Arcanista"?10:20,multiplier=source.identity.className==="Arcanista"?1:2;let total=base+multiplier*num(attrs.constituicao);for(let i=0;i<idx;i++)total+=base+multiplier*num(p.hpSnapshots[i]);return total}
-function progressionClassMana(source,attrs){const idx=tierIndex(source.identity.existence),p=ensureProgressionState(source);if(source.identity.className!=="Arcanista")return (idx+1)*10;let total=10+2*num(attrs.arcanismo);for(let i=0;i<idx;i++)total+=10+2*num(p.manaSnapshots[i]);return total}
+function progressionClassMana(source,attrs){const idx=tierIndex(source.identity.existence),p=ensureProgressionState(source);if(source.identity.className!=="Arcanista")return (idx+1)*10;let total=20+2*num(attrs.arcanismo);for(let i=0;i<idx;i++)total+=20+2*num(p.manaSnapshots[i]);return total}
 function proficiencyFor(source){return EXISTENCE[source.identity.existence]?.prof??5}
 function proficiency(){return proficiencyFor(state)}
 function professionSkillName(source){return String(source.identity?.profession||"").trim()}
