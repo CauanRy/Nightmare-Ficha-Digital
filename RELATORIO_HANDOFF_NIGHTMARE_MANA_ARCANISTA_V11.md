@@ -28,7 +28,7 @@ Foram cobertos Desperto com Arcanismo 0 e 5; toda a progressão natural `30, 64,
 
 ## 7. Publicação
 
-O estado da publicação será registrado na entrega final após a validação do GitHub Pages.
+A correção foi publicada na branch principal no commit remoto `1292e4b3be3fe6bf472cc58847e67cba01d265a1` e validada no GitHub Pages. A página servida confirmou Mana máxima 30 para Arcanista Desperto com Arcanismo 5.
 
 ## 8. Divergências
 
